@@ -19,6 +19,8 @@ import {
   View,
 } from 'react-native';
 import { api } from '../../convex/_generated/api';
+import { SpotifyTrack } from '../services/spotifyService';
+import SpotifyMusicSelector from './SpotifyMusicSelector';
 
 import axios from 'axios';
 import * as Location from 'expo-location';
@@ -52,6 +54,8 @@ export default function HomeScreen({ onNavigateToSettings }: HomeScreenProps) {
   const isMountedRef = useRef(true);
 
   const [selectedMood, setSelectedMood] = useState<string | null>(null);
+  const [showSpotifyModal, setShowSpotifyModal] = useState(false);
+  const [selectedTrack, setSelectedTrack] = useState<SpotifyTrack | null>(null);
 
   const [location, setLocation] = useState<string>('Cairo');
   const [temperature, setTemperature] = useState<number>(28);
@@ -262,10 +266,23 @@ export default function HomeScreen({ onNavigateToSettings }: HomeScreenProps) {
   };
 
   const handleSpotifyConnect = () => {
+    if (!selectedMood) {
+      Alert.alert(
+        'Select Your Mood First',
+        'Please select how you\'re feeling before choosing music.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+    setShowSpotifyModal(true);
+  };
+
+  const handleTrackSelect = (track: SpotifyTrack) => {
+    setSelectedTrack(track);
     Alert.alert(
-      'Spotify Integration 🎵',
-      'Connect your Spotify account to automatically detect your mood from your music!\n\nThis feature is coming soon.',
-      [{ text: 'OK' }]
+      'Song Selected! 🎵',
+      `"${track.name}" by ${track.artists.map(a => a.name).join(', ')}\n\nThis perfectly captures your ${selectedMood} mood!`,
+      [{ text: 'Awesome!' }]
     );
   };
 
@@ -443,12 +460,14 @@ export default function HomeScreen({ onNavigateToSettings }: HomeScreenProps) {
                 <MaterialCommunityIcons name="spotify" size={32} color="#1DB954" />
               </View>
               <View style={styles.musicTextContainer}>
-                <Text style={styles.musicTitle}>Detect Mood from Music</Text>
-                <Text style={styles.musicSubtitle}>Connect Spotify to auto-detect</Text>
+                <Text style={styles.musicTitle}>Express Mood with Music</Text>
+                <Text style={styles.musicSubtitle}>
+                  {selectedTrack 
+                    ? `Playing: ${selectedTrack.name.substring(0, 25)}${selectedTrack.name.length > 25 ? '...' : ''}` 
+                    : 'Browse and preview songs'}
+                </Text>
               </View>
-              <View style={styles.comingSoonBadge}>
-                <Text style={styles.comingSoonText}>Soon</Text>
-              </View>
+              <MaterialCommunityIcons name="chevron-right" size={24} color="#8D6E63" />
             </TouchableOpacity>
           </View>
         </Animated.View>
@@ -556,6 +575,14 @@ export default function HomeScreen({ onNavigateToSettings }: HomeScreenProps) {
           </Text>
         </TouchableOpacity>
       </Animated.View>
+
+      {/* Spotify Music Selector Modal */}
+      <SpotifyMusicSelector
+        visible={showSpotifyModal}
+        onClose={() => setShowSpotifyModal(false)}
+        onSelectTrack={handleTrackSelect}
+        selectedMood={selectedMood}
+      />
     </View>
   );
 }
