@@ -1,0 +1,50 @@
+{
+  "expo": {
+    "name": "Sip&Match",
+    "slug": "Sip&Match",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/SipMatchLogo.png",
+    "scheme": "sipmatch",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/images/SipMatchLogo.png",
+        "backgroundImage": "./assets/images/SipMatchLogo.png",
+        "monochromeImage": "./assets/images/SipMatchLogo.png"
+      },
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "output": "static",
+      "favicon": "./assets/images/SipMatchLogo.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/SipMatchLogo.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff",
+          "dark": {
+            "backgroundColor": "#000000"
+          }
+        }
+      ],
+      "expo-secure-store",
+      "expo-web-browser"
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
+  }
+}
