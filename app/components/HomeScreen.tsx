@@ -27,6 +27,7 @@ import * as Location from 'expo-location';
 
 const { width } = Dimensions.get('window');
 const ONBOARDING_KEY = '@sip_match_onboarding_complete';
+const ML_API_URL = 'http://192.168.1.3:3000'; // Your ngrok URL // Replace with your actual ML API URL
 
 interface Mood {
   id: string;
@@ -246,22 +247,73 @@ export default function HomeScreen({ onNavigateToSettings }: HomeScreenProps) {
     }
   };
 
-  const handleGetRecommendation = () => {
+  const handleGetRecommendation = async () => {
     if (!selectedMood) {
       Alert.alert('Select Your Mood', 'Please select how you\'re feeling first!');
       return;
     }
 
     try {
-      const selectedMoodData = moods.find(m => m.id === selectedMood);
-      Alert.alert(
-        'Coming Soon! 🎉',
-        `We're getting your perfect ${selectedMoodData?.label.toLowerCase()} drink ready!\n\nThis feature will match drinks to your mood, music, and weather.`,
-        [{ text: 'Got it!' }]
+      const currentLocation = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+
+      const { latitude, longitude } = currentLocation.coords;
+
+      const requestBody = {
+        user_id: user?.id || '',
+        email: user?.emailAddresses[0]?.emailAddress || '',
+        mood: selectedMood,
+        song: selectedTrack ? `${selectedTrack.name} - ${selectedTrack.artists.map(a => a.name).join(', ')}` : null,
+        location: {
+          latitude: latitude,
+          longitude: longitude,
+          city: location
+        },
+        weather: {
+          temperature: temperature,
+          condition: weatherIcon.replace('weather-', ''),
+          humidity: null
+        },
+        timestamp: new Date().toISOString()
+      };
+
+      const apiUrl = `${ML_API_URL}/api/v1/recommend`;
+      
+      console.log('🔍 API URL:', apiUrl);
+      console.log('📤 Sending request...');
+      console.log('📦 Request body:', JSON.stringify(requestBody, null, 2));
+
+      const response = await axios.post(
+        apiUrl,
+        requestBody,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        }
       );
+
+      console.log('✅ Response received:', response.data);
+
+      if (response.data.success) {
+        const drink = response.data.recommended_drink;
+        Alert.alert(
+          '🎉 Your Perfect Drink!',
+          `${drink.name}\n\n${drink.description}\n\nConfidence: ${Math.round((response.data.confidence_score || 0) * 100)}%\n\nReason: ${response.data.reasoning}`,
+          [{ text: 'Awesome!' }]
+        );
+      }
+
     } catch (error) {
-      console.error('Error getting recommendation:', error);
-      Alert.alert('Error', 'Something went wrong. Please try again.');
+      if (axios.isAxiosError(error)) {
+        console.error('❌ Error details:', error.response?.data || error.message);
+        console.error('❌ Status code:', error.response?.status);
+        console.error('❌ Full URL tried:', `${ML_API_URL}/api/v1/recommend`);
+      } else {
+        console.error('❌ Error:', error);
+      }
+      Alert.alert('Error', 'Failed to get recommendation. Please try again.');
     }
   };
 
@@ -292,6 +344,10 @@ export default function HomeScreen({ onNavigateToSettings }: HomeScreenProps) {
 
   const handleNavigateToHistory = () => {
     Alert.alert('History', 'Your drink history feature is coming soon!', [{ text: 'OK' }]);
+  };
+
+  const handleNavigateToDrinks = () => {
+    router.push('/drinks');
   };
 
   const handleResetOnboarding = async () => {
@@ -496,12 +552,16 @@ export default function HomeScreen({ onNavigateToSettings }: HomeScreenProps) {
             <Text style={styles.statLabel}>History</Text>
           </TouchableOpacity>
 
-          <View style={styles.statCard}>
+          <TouchableOpacity
+            onPress={handleNavigateToDrinks}
+            style={styles.statCard}
+            activeOpacity={0.7}
+          >
             <View style={[styles.statIconContainer, { backgroundColor: '#FFF4E6' }]}>
               <MaterialCommunityIcons name="coffee" size={28} color="#D97706" />
             </View>
-            <Text style={styles.statLabel}>23 drinks</Text>
-          </View>
+            <Text style={styles.statLabel}>All Drinks</Text>
+          </TouchableOpacity>
         </Animated.View>
 
         {/* Today's Suggestion */}
