@@ -19,7 +19,9 @@ import {
   View,
 } from 'react-native';
 import { api } from '../../convex/_generated/api';
+import { MLDrinkRecommendation, mlService } from '../services/mlService';
 import { SpotifyTrack } from '../services/spotifyService';
+import RecommendationsScreen from './RecommendationsScreen';
 import SpotifyMusicSelector from './SpotifyMusicSelector';
 
 import axios from 'axios';
@@ -57,6 +59,11 @@ export default function HomeScreen({ onNavigateToSettings }: HomeScreenProps) {
   const [selectedMood, setSelectedMood] = useState<string | null>(null);
   const [showSpotifyModal, setShowSpotifyModal] = useState(false);
   const [selectedTrack, setSelectedTrack] = useState<SpotifyTrack | null>(null);
+
+  const [showRecommendations, setShowRecommendations] = useState(false);
+  const [mlRecommendations, setMlRecommendations] = useState<MLDrinkRecommendation[]>([]);
+  const [mlContext, setMlContext] = useState<any>(null);
+  const [isLoadingRecommendations, setIsLoadingRecommendations] = useState(false);
 
   const [location, setLocation] = useState<string>('Cairo');
   const [temperature, setTemperature] = useState<number>(28);
@@ -253,18 +260,24 @@ export default function HomeScreen({ onNavigateToSettings }: HomeScreenProps) {
       return;
     }
 
+    setIsLoadingRecommendations(true);
+
     try {
+      // Get current location
       const currentLocation = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,
       });
 
       const { latitude, longitude } = currentLocation.coords;
 
+      // Prepare request body
       const requestBody = {
-        user_id: user?.id || '',
-        email: user?.emailAddresses[0]?.emailAddress || '',
-        mood: selectedMood,
-        song: selectedTrack ? `${selectedTrack.name} - ${selectedTrack.artists.map(a => a.name).join(', ')}` : null,
+        user_id: user?.id || 'guest',
+        email: user?.emailAddresses[0]?.emailAddress || 'guest@sipmatch.com',
+        mood: selectedMood.charAt(0).toUpperCase() + selectedMood.slice(1),
+        song: selectedTrack 
+          ? `${selectedTrack.name} - ${selectedTrack.artists.map(a => a.name).join(', ')}` 
+          : null,
         location: {
           latitude: latitude,
           longitude: longitude,
@@ -278,42 +291,39 @@ export default function HomeScreen({ onNavigateToSettings }: HomeScreenProps) {
         timestamp: new Date().toISOString()
       };
 
-      const apiUrl = `${ML_API_URL}/api/v1/recommend`;
-      
-      console.log('🔍 API URL:', apiUrl);
-      console.log('📤 Sending request...');
-      console.log('📦 Request body:', JSON.stringify(requestBody, null, 2));
+      console.log('📤 Sending ML request:', requestBody);
 
-      const response = await axios.post(
-        apiUrl,
-        requestBody,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-          }
-        }
-      );
+      // Call ML service
+      const response = await mlService.getRecommendations(requestBody);
 
-      console.log('✅ Response received:', response.data);
-
-      if (response.data.success) {
-        const drink = response.data.recommended_drink;
+      if (response.success && response.recommendations.length > 0) {
+        console.log('✅ Got recommendations:', response.recommendations.length);
+        
+        // Store recommendations and context
+        setMlRecommendations(response.recommendations);
+        setMlContext(response.context);
+        
+        // Show recommendations screen
+        setShowRecommendations(true);
+      } else {
         Alert.alert(
-          '🎉 Your Perfect Drink!',
-          `${drink.name}\n\n${drink.description}\n\nConfidence: ${Math.round((response.data.confidence_score || 0) * 100)}%\n\nReason: ${response.data.reasoning}`,
-          [{ text: 'Awesome!' }]
+          'No Recommendations Found',
+          response.error || 'Unable to find matching drinks. Please try again.',
+          [{ text: 'OK' }]
         );
       }
-
     } catch (error) {
-      if (axios.isAxiosError(error)) {
-        console.error('❌ Error details:', error.response?.data || error.message);
-        console.error('❌ Status code:', error.response?.status);
-        console.error('❌ Full URL tried:', `${ML_API_URL}/api/v1/recommend`);
-      } else {
-        console.error('❌ Error:', error);
-      }
-      Alert.alert('Error', 'Failed to get recommendation. Please try again.');
+      console.error('❌ Error getting recommendations:', error);
+      Alert.alert(
+        'Connection Error',
+        'Unable to connect to recommendation service. Please make sure:\n\n' +
+        '1. The ML server is running on your computer\n' +
+        '2. Your phone and computer are on the same WiFi network\n' +
+        '3. The IP address (192.168.1.3) is correct',
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setIsLoadingRecommendations(false);
     }
   };
 
@@ -382,6 +392,18 @@ export default function HomeScreen({ onNavigateToSettings }: HomeScreenProps) {
   // Then update the userName and userImageUrl variables
   const userName = convexUser?.userName || user?.firstName || user?.username || 'Friend';
   const userImageUrl = convexUser?.image || null;
+
+  if (showRecommendations && mlRecommendations.length > 0 && mlContext) {
+    return (
+      <RecommendationsScreen
+        recommendations={mlRecommendations}
+        context={mlContext}
+        onBack={() => setShowRecommendations(false)}
+        selectedMood={selectedMood || ''}
+        selectedSong={selectedTrack ? `${selectedTrack.name} - ${selectedTrack.artists.map(a => a.name).join(', ')}` : null}
+      />
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -560,7 +582,7 @@ export default function HomeScreen({ onNavigateToSettings }: HomeScreenProps) {
             <View style={[styles.statIconContainer, { backgroundColor: '#FFF4E6' }]}>
               <MaterialCommunityIcons name="coffee" size={28} color="#D97706" />
             </View>
-            <Text style={styles.statLabel}>All Drinks</Text>
+            <Text style={styles.statLabel}>Drinks</Text>
           </TouchableOpacity>
         </Animated.View>
 
@@ -626,13 +648,26 @@ export default function HomeScreen({ onNavigateToSettings }: HomeScreenProps) {
       >
         <TouchableOpacity
           onPress={handleGetRecommendation}
-          disabled={!selectedMood}
-          style={[styles.ctaButton, !selectedMood && styles.ctaButtonDisabled]}
+          disabled={!selectedMood || isLoadingRecommendations}
+          style={[
+            styles.ctaButton, 
+            (!selectedMood || isLoadingRecommendations) && styles.ctaButtonDisabled
+          ]}
           activeOpacity={0.8}
         >
-          <Text style={[styles.ctaButtonText, !selectedMood && styles.ctaButtonTextDisabled]}>
-            Get Recommendation
-          </Text>
+          {isLoadingRecommendations ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator color="#FFFFFF" />
+              <Text style={styles.loadingText}>Finding perfect drinks...</Text>
+            </View>
+          ) : (
+            <Text style={[
+              styles.ctaButtonText, 
+              !selectedMood && styles.ctaButtonTextDisabled
+            ]}>
+              Get Recommendation
+            </Text>
+          )}
         </TouchableOpacity>
       </Animated.View>
 
@@ -979,5 +1014,15 @@ const styles = StyleSheet.create({
   },
   ctaButtonTextDisabled: {
     color: '#A1887F',
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  loadingText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
 });
