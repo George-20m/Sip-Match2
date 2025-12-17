@@ -21,6 +21,7 @@ import {
 import { api } from '../../convex/_generated/api';
 import { MLDrinkRecommendation, mlService } from '../services/mlService';
 import { SpotifyTrack } from '../services/spotifyService';
+import FavoritesScreen from './FavoritesScreen';
 import HistoryScreen from './HistoryScreen';
 import RecommendationsScreen from './RecommendationsScreen';
 import SpotifyMusicSelector from './SpotifyMusicSelector';
@@ -66,6 +67,7 @@ export default function HomeScreen({ onNavigateToSettings }: HomeScreenProps) {
   const [mlContext, setMlContext] = useState<any>(null);
   const [isLoadingRecommendations, setIsLoadingRecommendations] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [showFavorites, setShowFavorites] = useState(false);
 
   const [location, setLocation] = useState<string>('Cairo');
   const [temperature, setTemperature] = useState<number>(28);
@@ -382,9 +384,12 @@ export default function HomeScreen({ onNavigateToSettings }: HomeScreenProps) {
   };
 
   const handleNavigateToFavorites = () => {
-    Alert.alert('Favorites', 'Your favorite drinks feature is coming soon!', [{ text: 'OK' }]);
+    if (!user?.id) {
+      Alert.alert('Sign In Required', 'Please sign in to view your favorites.', [{ text: 'OK' }]);
+      return;
+    }
+    setShowFavorites(true);
   };
-
   const handleNavigateToHistory = () => {
     if (!user?.id) {
       Alert.alert('Sign In Required', 'Please sign in to view your history.', [{ text: 'OK' }]);
@@ -432,6 +437,16 @@ export default function HomeScreen({ onNavigateToSettings }: HomeScreenProps) {
   const userName = convexUser?.userName || user?.firstName || user?.username || 'Friend';
   const userImageUrl = convexUser?.image || null;
 
+  // Show favorites screen if active
+  if (showFavorites) {
+    return (
+      <FavoritesScreen
+        onBack={() => setShowFavorites(false)}
+        userId={user?.id || ''}
+      />
+    );
+  }
+
   // Show history screen if active
   if (showHistory) {
     return (
@@ -451,6 +466,7 @@ export default function HomeScreen({ onNavigateToSettings }: HomeScreenProps) {
         onBack={() => setShowRecommendations(false)}
         selectedMood={selectedMood || ''}
         selectedSong={selectedTrack ? `${selectedTrack.name} - ${selectedTrack.artists.map(a => a.name).join(', ')}` : null}
+        userId={user?.id || ''}
       />
     );
   }

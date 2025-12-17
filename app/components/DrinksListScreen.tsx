@@ -3,28 +3,31 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useQuery } from 'convex/react';
 import React, { useState } from 'react';
 import {
-    ActivityIndicator,
-    Dimensions,
-    FlatList,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Dimensions,
+  FlatList,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { api } from '../../convex/_generated/api';
+import { Id } from '../../convex/_generated/dataModel';
+import FavoriteButton from './FavoriteButton';
 
 const { width } = Dimensions.get('window');
 
 interface DrinksListScreenProps {
   onBack?: () => void;
+  userId?: string;
 }
 
 type TemperatureFilter = 'all' | 'hot' | 'cold' | 'frozen';
 type CaffeineFilter = 'all' | 'none' | 'low' | 'medium' | 'high';
 
-export default function DrinksListScreen({ onBack }: DrinksListScreenProps) {
+export default function DrinksListScreen({ onBack, userId }: DrinksListScreenProps) {
   const [temperatureFilter, setTemperatureFilter] = useState<TemperatureFilter>('all');
   const [caffeineFilter, setCaffeineFilter] = useState<CaffeineFilter>('all');
   const [searchCategory, setSearchCategory] = useState<string | null>(null);
@@ -101,6 +104,15 @@ export default function DrinksListScreen({ onBack }: DrinksListScreenProps) {
 
   const renderDrinkCard = ({ item }: { item: any }) => (
     <TouchableOpacity style={styles.drinkCard} activeOpacity={0.7}>
+      {/* Favorite Button */}
+      {userId && (
+        <FavoriteButton 
+          userId={userId}
+          drinkId={item._id as Id<"drinks">}
+          style={styles.favoriteButtonPosition}
+        />
+      )}
+      
       <View style={styles.drinkHeader}>
         <View style={styles.drinkTitleContainer}>
           <Text style={styles.drinkName}>{item.name}</Text>
@@ -449,12 +461,20 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
+    position: 'relative',
+  },
+  favoriteButtonPosition: {
+    position: 'absolute',
+    bottom: 12,
+    right: 12,
+    zIndex: 1,
   },
   drinkHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: 8,
+    paddingRight: 48,
   },
   drinkTitleContainer: {
     flex: 1,

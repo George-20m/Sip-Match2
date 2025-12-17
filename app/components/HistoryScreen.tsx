@@ -12,7 +12,9 @@ import {
     View,
 } from 'react-native';
 import { api } from '../../convex/_generated/api';
+import { Id } from '../../convex/_generated/dataModel';
 import { MLDrinkRecommendation } from '../services/mlService';
+import FavoriteButton from './FavoriteButton';
 import RecommendationsScreen from './RecommendationsScreen';
 
 interface HistoryScreenProps {
@@ -115,6 +117,7 @@ export default function HistoryScreen({ onBack, userId }: HistoryScreenProps) {
   const renderHistoryItem = ({ item }: { item: any }) => {
     const context = item.context;
     const drinksCount = item.recommendations.length;
+    const firstDrink = item.recommendations[0]?.drink;
 
     return (
       <TouchableOpacity
@@ -122,6 +125,16 @@ export default function HistoryScreen({ onBack, userId }: HistoryScreenProps) {
         onPress={() => handleSessionPress(item)}
         activeOpacity={0.7}
       >
+        {/* Favorite Button */}
+        {firstDrink && userId && (
+          <FavoriteButton 
+            userId={userId}
+            drinkId={firstDrink._id as Id<"drinks">}
+            style={styles.favoriteButtonPosition}
+            size={20}
+          />
+        )}
+        
         {/* Header */}
         <View style={styles.historyHeader}>
           <View style={styles.dateTimeContainer}>
@@ -200,6 +213,7 @@ export default function HistoryScreen({ onBack, userId }: HistoryScreenProps) {
         onBack={handleBackFromRecommendations}
         selectedMood={selectedSession.context.mood}
         selectedSong={null}
+        userId={userId}
       />
     );
   }
@@ -322,6 +336,15 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
+    position: 'relative',
+  },
+  favoriteButtonPosition: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+    zIndex: 1,
+    width: 32,
+    height: 32,
   },
   historyHeader: {
     flexDirection: 'row',

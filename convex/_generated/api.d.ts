@@ -9,6 +9,7 @@
  */
 
 import type * as drinks from "../drinks.js";
+import type * as favorites from "../favorites.js";
 import type * as recommendations from "../recommendations.js";
 import type * as seedDrinks from "../seedDrinks.js";
 import type * as users from "../users.js";
@@ -21,6 +22,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   drinks: typeof drinks;
+  favorites: typeof favorites;
   recommendations: typeof recommendations;
   seedDrinks: typeof seedDrinks;
   users: typeof users;

@@ -1,5 +1,5 @@
 // app/drinks.tsx
-import { useAuth } from '@clerk/clerk-expo';
+import { useAuth, useUser } from '@clerk/clerk-expo';
 import { Redirect, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
@@ -7,6 +7,7 @@ import DrinksListScreen from './components/DrinksListScreen';
 
 export default function Drinks() {
   const { isSignedIn, isLoaded } = useAuth();
+  const { user } = useUser();
   const router = useRouter();
   const [forceRender, setForceRender] = useState(false);
 
@@ -46,7 +47,7 @@ export default function Drinks() {
   };
 
   // Show drinks list screen
-  return <DrinksListScreen onBack={handleBack} />;
+  return <DrinksListScreen onBack={handleBack} userId={user?.id} />;
 }
 
 const styles = StyleSheet.create({

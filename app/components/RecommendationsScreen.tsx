@@ -1,5 +1,6 @@
 // app/components/RecommendationsScreen.tsx
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useQuery } from 'convex/react';
 import React from 'react';
 import {
   Dimensions,
@@ -10,7 +11,10 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
+import { api } from '../../convex/_generated/api';
+import { Id } from '../../convex/_generated/dataModel';
 import { MLDrinkRecommendation } from '../services/mlService';
+import FavoriteButton from './FavoriteButton';
 
 const { width } = Dimensions.get('window');
 
@@ -26,6 +30,7 @@ interface RecommendationsScreenProps {
   onBack: () => void;
   selectedMood: string;
   selectedSong?: string | null;
+  userId: string;
 }
 
 export default function RecommendationsScreen({
@@ -34,7 +39,10 @@ export default function RecommendationsScreen({
   onBack,
   selectedMood,
   selectedSong,
+  userId,
 }: RecommendationsScreenProps) {
+  // Add query to get all drinks
+  const allDrinks = useQuery(api.drinks.getAllDrinks);
   const getCaffeineIcon = (level: string) => {
     switch (level) {
       case 'high': return 'lightning-bolt';
@@ -100,17 +108,31 @@ export default function RecommendationsScreen({
     return '#93C5FD';
   };
 
-  const renderDrinkCard = ({ item, index }: { item: MLDrinkRecommendation; index: number }) => (
-    <View style={styles.drinkCard}>
-      {/* Ranking Badge */}
-      <View style={[
-        styles.rankBadge,
-        index === 0 && styles.rankBadgeFirst,
-        index === 1 && styles.rankBadgeSecond,
-        index === 2 && styles.rankBadgeThird,
-      ]}>
-        <Text style={styles.rankText}>#{index + 1}</Text>
-      </View>
+  const renderDrinkCard = ({ item, index }: { item: MLDrinkRecommendation; index: number }) => {
+    // Find the drink ID by matching the name
+    const drinkData = allDrinks?.find(d => d.name === item.name);
+    const drinkId = drinkData?._id;
+
+    return (
+      <View style={styles.drinkCard}>
+        {/* Favorite Button */}
+        {drinkId && userId && (
+          <FavoriteButton 
+            userId={userId}
+            drinkId={drinkId as Id<"drinks">}
+            style={styles.favoriteButtonPosition}
+          />
+        )}
+
+        {/* Ranking Badge */}
+        <View style={[
+          styles.rankBadge,
+          index === 0 && styles.rankBadgeFirst,
+          index === 1 && styles.rankBadgeSecond,
+          index === 2 && styles.rankBadgeThird,
+        ]}>
+          <Text style={styles.rankText}>#{index + 1}</Text>
+        </View>
 
       {/* Score Badge */}
       <View style={[styles.scoreBadge, { backgroundColor: `${getScoreColor(item.score)}20` }]}>
@@ -219,7 +241,8 @@ export default function RecommendationsScreen({
         </View>
       )}
     </View>
-  );
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -424,6 +447,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: '#FFFFFF',
+  },
+  favoriteButtonPosition: {
+    position: 'absolute',
+    bottom: 12,
+    right: 12,
+    zIndex: 2,
   },
   scoreBadge: {
     position: 'absolute',
