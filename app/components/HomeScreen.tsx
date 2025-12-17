@@ -2,7 +2,7 @@
 import { useUser } from '@clerk/clerk-expo';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useQuery } from 'convex/react';
+import { useMutation, useQuery } from 'convex/react';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
@@ -21,6 +21,7 @@ import {
 import { api } from '../../convex/_generated/api';
 import { MLDrinkRecommendation, mlService } from '../services/mlService';
 import { SpotifyTrack } from '../services/spotifyService';
+import HistoryScreen from './HistoryScreen';
 import RecommendationsScreen from './RecommendationsScreen';
 import SpotifyMusicSelector from './SpotifyMusicSelector';
 
@@ -64,6 +65,7 @@ export default function HomeScreen({ onNavigateToSettings }: HomeScreenProps) {
   const [mlRecommendations, setMlRecommendations] = useState<MLDrinkRecommendation[]>([]);
   const [mlContext, setMlContext] = useState<any>(null);
   const [isLoadingRecommendations, setIsLoadingRecommendations] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
 
   const [location, setLocation] = useState<string>('Cairo');
   const [temperature, setTemperature] = useState<number>(28);
@@ -303,6 +305,37 @@ export default function HomeScreen({ onNavigateToSettings }: HomeScreenProps) {
         setMlRecommendations(response.recommendations);
         setMlContext(response.context);
         
+        // Save recommendations to Convex database
+        try {
+          if (user?.id && allDrinks) {
+            // Match ML recommendations to Convex drink IDs
+            const drinkIds = response.recommendations
+              .map(mlDrink => {
+                const drink = allDrinks.find(d => d.name === mlDrink.name);
+                return drink?._id;
+              })
+              .filter(Boolean) as any[];
+
+            if (drinkIds.length > 0) {
+              await saveRecommendationBatch({
+                userId: user.id,
+                drinkIds: drinkIds,
+                context: {
+                  mood: selectedMood.charAt(0).toUpperCase() + selectedMood.slice(1),
+                  temperature: temperature,
+                  weatherCondition: weatherIcon.replace('weather-', ''),
+                  timeOfDay: response.context.time_of_day,
+                  song: selectedTrack?.name,
+                },
+              });
+              console.log('✅ Saved recommendations to history');
+            }
+          }
+        } catch (error) {
+          console.error('Failed to save recommendations:', error);
+          // Don't block user experience if save fails
+        }
+        
         // Show recommendations screen
         setShowRecommendations(true);
       } else {
@@ -353,7 +386,11 @@ export default function HomeScreen({ onNavigateToSettings }: HomeScreenProps) {
   };
 
   const handleNavigateToHistory = () => {
-    Alert.alert('History', 'Your drink history feature is coming soon!', [{ text: 'OK' }]);
+    if (!user?.id) {
+      Alert.alert('Sign In Required', 'Please sign in to view your history.', [{ text: 'OK' }]);
+      return;
+    }
+    setShowHistory(true);
   };
 
   const handleNavigateToDrinks = () => {
@@ -388,11 +425,24 @@ export default function HomeScreen({ onNavigateToSettings }: HomeScreenProps) {
     api.users.getCurrentUser,
     user?.id ? { clerkId: user.id } : "skip"
   );
+  const saveRecommendationBatch = useMutation(api.recommendations.saveRecommendationBatch);
+  const allDrinks = useQuery(api.drinks.getAllDrinks);
 
   // Then update the userName and userImageUrl variables
   const userName = convexUser?.userName || user?.firstName || user?.username || 'Friend';
   const userImageUrl = convexUser?.image || null;
 
+  // Show history screen if active
+  if (showHistory) {
+    return (
+      <HistoryScreen
+        onBack={() => setShowHistory(false)}
+        userId={user?.id || ''}
+      />
+    );
+  }
+
+  // Show recommendations screen if available (keep existing code below)
   if (showRecommendations && mlRecommendations.length > 0 && mlContext) {
     return (
       <RecommendationsScreen
